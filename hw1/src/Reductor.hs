@@ -2,35 +2,48 @@ module Reductor
   ( normilize
   ) where
 
+  import Control.Monad.State
   import Simplifier (Expression(..))
   import Data.List
   import qualified Data.Map.Strict as Map
 
   type Matcher = Map.Map String String
+  type Memory = Map.Map Expression (Maybe Expression)
+  type MemState = State Memory (Maybe (Integer, Expression))
 
   normilize :: Expression -> Expression
-  normilize = normilizeI 0
+  normilize ex = case fst $ runState (normilizeI 0 0 ex) Map.empty of
+    Just x  -> snd x
+    Nothing -> ex
     where
-      normilizeI :: Integer -> Expression -> Expression
-      normilizeI i e = case betaReduction i e of
-        Just x  -> normilizeI (fst x) (snd x)
-        Nothing -> e
+      normilizeI :: Integer -> Integer -> Expression -> MemState
+      normilizeI k i e = do
+        may <- betaReduction i e
+        case may of
+          Just x  -> normilizeI (k+1) (fst x) (snd x)
+          Nothing -> return $ return (0, e)
 
-  betaReduction :: Integer -> Expression -> Maybe (Integer, Expression)
+  betaReduction :: Integer -> Expression -> MemState
   betaReduction i (Application l r) = case l of
     Lambda v e -> do
       let col = delete v $ intersect (getVars l) (getVars r)
       let (j, m) = getMatcher i col
-      return (j, substitute v (rename m r) e)
-    _ -> case betaReduction i l of
-      Just x  -> return (fst x, Application (snd x) r)
-      Nothing -> case betaReduction i r of
-        Just y  -> return (fst y, Application l (snd y))
-        Nothing -> Nothing
-  betaReduction i (Lambda v e) = case betaReduction i e of
-    Just x  -> return (fst x, Lambda v (snd x))
-    Nothing -> Nothing
-  betaReduction _ (Variable _) = Nothing
+      return $ return (j, substitute v (rename m r) e)
+    _ -> do
+      mayL <- betaReduction i l
+      case mayL of
+        Just x  -> return $ return (fst x, Application (snd x) r)
+        Nothing -> do
+          mayR <- betaReduction i r
+          case mayR of
+            Just y  -> return $ return (fst y, Application l (snd y))
+            Nothing -> return Nothing
+  betaReduction i (Lambda v e) = do
+    may <- betaReduction i e
+    case may of
+      Just x  -> return $ return (fst x, Lambda v (snd x))
+      Nothing -> return Nothing
+  betaReduction _ (Variable _) = return Nothing
 
   substitute :: String -> Expression -> Expression -> Expression
   substitute s x (Application l r) = Application (substitute s x l) (substitute s x r)

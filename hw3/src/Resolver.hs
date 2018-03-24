@@ -1,25 +1,31 @@
 module Resolver
   ( resolveSystem
   , insertType
+  , getVars
+  , getFreeVars
   , Matcher
   , TypeExpr(..)
   ) where
 
+  import Data.List ((\\))
   import Control.Applicative ((<|>))
   import qualified Data.Map.Strict as Map
 
   data TypeExpr = Implication  TypeExpr TypeExpr
                 | Equation     TypeExpr TypeExpr
+                | UniversalQ   String   TypeExpr
                 | TypeVariable String
 
   instance Show TypeExpr where
     show (Equation    l r) = show l ++ " = " ++ show r
     show (Implication l r) = "(" ++ show l ++ " -> " ++ show r ++ ")"
+    show (UniversalQ  s e) = "@" ++ s ++ " . " ++ show e
     show (TypeVariable  s) = s
 
   instance Eq TypeExpr where
     (==) (Implication l1 r1) (Implication l2 r2) = (l1 == l2) && (r1 == r2)
     (==) (Equation    l1 r1) (Equation    l2 r2) = (l1 == l2) && (r1 == r2)
+    (==) (UniversalQ  s1 e1) (UniversalQ  s2 e2) = (s1 == s2) && (e1 == e2)
     (==) (TypeVariable   s1) (TypeVariable   s2) = (s1 == s2)
     (==) _                   _                   = False
 
@@ -97,12 +103,14 @@ module Resolver
   getVars :: TypeExpr -> [String]
   getVars (Equation    l r) = getVars l ++ getVars r
   getVars (Implication l r) = getVars l ++ getVars r
+  getVars (UniversalQ  _ e) = getVars e
   getVars (TypeVariable  s) = [s]
 
-  -- getFreeVars :: TypeExpr -> [String]
-  -- getFreeVars (Equation    l r) = getFreeVars l ++ getFreeVars r
-  -- getFreeVars (Implication l r) = getFreeVars l ++ getFreeVars r
-  -- getFreeVars (TypeVariable  s) = [s]
+  getFreeVars :: TypeExpr -> [String]
+  getFreeVars (Equation    l r) = getFreeVars l ++ getFreeVars r
+  getFreeVars (Implication l r) = getFreeVars l ++ getFreeVars r
+  getFreeVars (UniversalQ  s e) = (getVars e) \\ [s]
+  getFreeVars (TypeVariable  s) = [s]
 
   getMatcher :: [TypeExpr] -> Matcher
   getMatcher list = foldl addExpr Map.empty list
@@ -116,6 +124,7 @@ module Resolver
   insertType :: Matcher -> TypeExpr -> TypeExpr
   insertType m (Equation    l r) = Equation (insertType m l) (insertType m r)
   insertType m (Implication l r) = Implication (insertType m l) (insertType m r)
+  insertType m (UniversalQ  s e) = UniversalQ s (insertType (Map.delete s m) e)
   insertType m (TypeVariable  s) = case Map.lookup s m of
     Just x  -> x
     Nothing -> TypeVariable s

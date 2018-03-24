@@ -36,10 +36,10 @@ resolver: lts-9.6
 # non-dependency (i.e. a user package), and its test suites and benchmarks
 # will not be run. This is useful for tweaking upstream packages.
 packages:
-- hw3
+- hw1
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
-extra-deps: [megaparsec-6.2.0, containers-0.5.7.1, mtl-2.2.1]
+extra-deps: [megaparsec-6.2.0, containers-0.5.7.1, mtl-2.2.1, clock-0.7.2]
 
 # Override default flag values for local packages and extra-deps
 flags: {}

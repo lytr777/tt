@@ -1,6 +1,7 @@
 module Main
   where
 
+    import System.Clock
     import Reductor (normilize)
     import Simplifier (reformatExpr)
     import Parser (exprBegin)
@@ -13,8 +14,11 @@ module Main
       case (parse exprBegin "" str) of
         Left err -> putStr (parseErrorPretty err)
         Right expr -> do
+          before <- getTime Realtime
           let refExpr = reformatExpr expr
           putStr (show refExpr ++ "\n")
           let norExpr = normilize refExpr
-          writeFile "task2.out" (show norExpr)
+          writeFile "task1.out" (show norExpr)
+          after <- getTime Realtime
+          putStr ((show $ sec (after - before)) ++ " second\n")
       return ()
