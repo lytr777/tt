@@ -2,7 +2,8 @@ module Main
   where
 
     import System.Clock
-    import Reductor (normilize)
+    -- import Reductor (normilize)
+    import HeadReductor (normilize)
     import Simplifier (reformatExpr)
     import Parser (exprBegin)
     import Text.Megaparsec (parse)
