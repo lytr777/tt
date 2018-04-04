@@ -2,27 +2,43 @@ module HeadReductor
   ( normilize
   ) where
 
+  import Control.Monad.State
   import Simplifier (Expression(..))
   import Data.List (elem, (\\))
+  import qualified Data.Map.Strict as Map
 
   type Scope = [String]
+  type Hash = Map.Map Expression Expression
+  type HeadState = State Hash Expression
 
   normilize :: Expression -> Expression
-  normilize = reduction []
+  normilize e = fst $ runState (reduction [] e) Map.empty
 
-  reduction :: Scope -> Expression -> Expression
-  reduction sc (Lambda      v e) = Lambda v (reduction (v:sc) e)
-  reduction sc (Application l r) = case headReduction [] l of
-    Lambda v e -> reduction (v:sc) (substitute (v:sc) v r e)
-    e          -> Application (reduction [] e) (reduction [] r)
-  reduction _  v                 = v
+  reduction :: Scope -> Expression -> HeadState
+  reduction sc (Lambda      v e) = (Lambda v) <$> (reduction (v:sc) e)
+  reduction sc (Application l r) = do
+    hr <- headReduction [] l
+    case hr of
+      Lambda v e -> reduction (v:sc) (substitute (v:sc) v r e)
+      e          -> Application <$> (reduction [] e) <*> (reduction [] r)
+  reduction _  v                 = return v
 
-  headReduction :: Scope -> Expression -> Expression
-  headReduction sc (Lambda      v e) = Lambda v (headReduction (v:sc) e)
-  headReduction sc (Application l r) = case headReduction sc l of
-    Lambda v e -> headReduction (v:sc) (substitute (v:sc) v r e)
-    e          -> Application e r
-  headReduction _ v                 = v
+  headReduction :: Scope -> Expression -> HeadState
+  headReduction sc (Lambda      v e) = (Lambda v) <$> (headReduction (v:sc) e)
+  headReduction sc (Application l r) = do
+    hr <- headReduction sc l
+    case hr of
+      e@(Lambda v lb) -> do
+        let key = Application e r
+        val <- gets (Map.lookup key)
+        case val of
+          Just x  -> return x
+          Nothing -> do
+            result <- headReduction (v:sc) (substitute (v:sc) v r lb)
+            modify (Map.insert key result)
+            return result
+      e               -> return $ Application e r
+  headReduction _ v                 = return v
 
   substitute :: Scope -> String -> Expression -> Expression -> Expression
   substitute sc s x (Application l r) = Application (substitute sc s x l) (substitute sc s x r)

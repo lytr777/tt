@@ -17,9 +17,10 @@ module Main
         Right expr -> do
           before <- getTime Realtime
           let refExpr = reformatExpr expr
-          putStr (show refExpr ++ "\n")
+          -- putStr (show refExpr ++ "\n")
           let norExpr = normilize refExpr
           writeFile "task1.out" (show norExpr)
           after <- getTime Realtime
-          putStr ((show $ sec (after - before)) ++ " second\n")
+          putStr (show norExpr ++ "\n")
+          putStr ((show $ sec (after - before)) ++ " second(s)\n")
       return ()
